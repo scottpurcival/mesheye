@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>MeshEye</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; flex-direction: column; height: 100vh; font-family: system-ui, sans-serif; background: #0f0f1a; color: #e0e0e0; overflow: hidden; }
+    #topbar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #0a0a14; border-bottom: 1px solid #2a2a3e; flex-shrink: 0; }
+    #topbar h1 { font-size: 17px; color: #4fc3f7; letter-spacing: 1px; margin-right: auto; }
+    #main { display: flex; flex: 1; min-height: 0; }
+    #sidebar { width: 280px; min-width: 280px; background: #0a0a14; border-right: 1px solid #2a2a3e; overflow-y: auto; display: flex; flex-direction: column; }
+    #cesium-container { flex: 1; position: relative; }
+    #statusbar { padding: 4px 16px; background: #0a0a14; border-top: 1px solid #2a2a3e; font-size: 11px; color: #666; flex-shrink: 0; }
+    .btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; background: #1565c0; color: #fff; }
+    .btn:hover { background: #1976d2; }
+    .btn-outline { background: transparent; border: 1px solid #4fc3f7; color: #4fc3f7; }
+    .btn-outline:hover { background: #4fc3f71a; }
+    .btn-danger { background: #c62828; }
+    .btn-danger:hover { background: #e53935; }
+    #panel-node, #panel-layers, #panel-unlocated { padding: 16px; display: none; flex-direction: column; gap: 10px; }
+    #panel-node.visible, #panel-layers.visible, #panel-unlocated.visible { display: flex; }
+    .field-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .field-value { font-size: 14px; }
+    input[type="range"] { width: 100%; accent-color: #4fc3f7; }
+    input[type="number"] { width: 100%; padding: 4px 8px; background: #1a1a2e; border: 1px solid #2a2a3e; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
+    .eirp-readout { font-size: 16px; font-weight: bold; padding: 8px; border-radius: 4px; text-align: center; }
+    .eirp-ok { background: #1b5e2033; color: #4caf50; border: 1px solid #4caf50; }
+    .eirp-warn { background: #b71c1c33; color: #ef5350; border: 1px solid #ef5350; }
+    .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .layer-row input[type="checkbox"] { accent-color: #4fc3f7; }
+    .separator { border: none; border-top: 1px solid #2a2a3e; }
+    .section-title { font-size: 12px; color: #4fc3f7; text-transform: uppercase; letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <h1>MeshEye</h1>
+    <button class="btn btn-outline" id="btn-layers">Layers</button>
+    <button class="btn btn-outline" id="btn-sync">Sync CoreScope</button>
+    <button class="btn" id="btn-plan-node">+ Plan Node</button>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div id="panel-node">
+        <div class="section-title">Node</div>
+        <hr class="separator" />
+        <div>
+          <div class="field-label">Name</div>
+          <div class="field-value" id="pn-name">—</div>
+        </div>
+        <div>
+          <div class="field-label">Role</div>
+          <div class="field-value" id="pn-role">—</div>
+        </div>
+        <div>
+          <div class="field-label">Position</div>
+          <div class="field-value" id="pn-pos">—</div>
+        </div>
+        <div>
+          <div class="field-label">Elevation AGL (m)</div>
+          <input type="number" id="pn-elev" value="5" min="0" max="200" />
+        </div>
+        <div>
+          <div class="field-label">TX Power (dBm) <span id="pn-tx-val">30</span></div>
+          <input type="range" id="pn-tx" min="22" max="30" value="30" />
+        </div>
+        <div>
+          <div class="field-label">Antenna Gain (dBi)</div>
+          <input type="number" id="pn-gain" value="0" min="0" max="12" step="0.5" />
+        </div>
+        <div class="eirp-readout eirp-ok" id="pn-eirp">EIRP: 30 dBm ✓</div>
+        <div id="pn-eirp-warn" style="display:none; font-size:12px; color:#ef5350;"></div>
+        <button class="btn" id="pn-calc">Calculate Coverage</button>
+        <button class="btn btn-danger" id="pn-remove" style="display:none;">Remove Node</button>
+      </div>
+      <div id="panel-layers">
+        <div class="section-title">Layers</div>
+        <hr class="separator" />
+        <label class="layer-row"><input type="checkbox" id="lyr-repeaters" checked /> Repeaters</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-rooms" checked /> Rooms</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-companions" checked /> Companions</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-sensors" checked /> Sensors</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-planned" checked /> Planned nodes</label>
+        <hr class="separator" />
+        <label class="layer-row"><input type="checkbox" id="lyr-links" checked /> Link quality arcs</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-coverage" checked /> Coverage (selected node)</label>
+        <label class="layer-row"><input type="checkbox" id="lyr-coverage-combined" /> Combined coverage</label>
+        <hr class="separator" />
+        <div id="unlocated-list" style="font-size:12px; color:#888;"></div>
+      </div>
+    </div>
+    <div id="cesium-container"></div>
+  </div>
+  <div id="statusbar">Initialising…</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
