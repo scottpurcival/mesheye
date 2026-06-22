@@ -5,6 +5,7 @@ import { fetchNodes, fetchLinks } from './api.js';
 import { renderNodes } from './node-layer.js';
 import { renderLinks } from './link-layer.js';
 import { initPanel } from './ui-panel.js';
+import { initLayers } from './layers.js';
 
 Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 
@@ -58,6 +59,7 @@ async function bootstrap() {
 
   document.getElementById('btn-sync').addEventListener('click', syncCoreScope);
   initPanel(viewer);
+  initLayers(viewer);
 }
 
 bootstrap();
