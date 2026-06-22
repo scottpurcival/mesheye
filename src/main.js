@@ -3,6 +3,7 @@ import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { state } from './state.js';
 import { fetchNodes, fetchLinks } from './api.js';
 import { renderNodes } from './node-layer.js';
+import { renderLinks } from './link-layer.js';
 
 Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 
@@ -21,6 +22,7 @@ async function syncCoreScope() {
     state.lastSyncTime = new Date();
 
     renderNodes(viewer, nodes);
+    renderLinks(viewer, [...state.packets.values()], state.nodes);
     document.getElementById('statusbar').textContent =
       `${state.nodes.size} nodes | ${state.packets.size} links | Last sync ${state.lastSyncTime.toLocaleTimeString()}`;
   } catch (err) {
