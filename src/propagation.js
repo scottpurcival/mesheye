@@ -16,8 +16,8 @@ export function antennaElevCorrDb(gainDbi, elevAngleRad) {
 }
 
 export function classifySignal(pRxDbm) {
-  if (pRxDbm > GOOD_THRESHOLD_DBM) return 'good';
-  if (pRxDbm > SENSITIVITY_DBM) return 'marginal';
+  if (pRxDbm >= GOOD_THRESHOLD_DBM) return 'good';
+  if (pRxDbm >= SENSITIVITY_DBM)    return 'marginal';
   return 'blocked';
 }
 

@@ -136,7 +136,7 @@ export function initPanel(viewer) {
       document.getElementById('btn-plan-node').textContent = '+ Plan Node';
       viewer.container.style.cursor = '';
 
-      const cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
+      const cartesian = viewer.scene.pickPosition(movement.position);
       if (!cartesian) return;
       const carto = Cesium.Cartographic.fromCartesian(cartesian);
       const lat = Cesium.Math.toDegrees(carto.latitude);

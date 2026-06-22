@@ -55,13 +55,21 @@ async function renderCombinedCoverage(viewer) {
 
   const allNodes = [
     ...[...state.nodes.values()].filter(n => n.lat != null).map(n => ({
-      ...n, id: `combined-${n.publicKey}`, elevAgl: 5, txPowerDbm: 30, gainDbi: 0, terrainH: 0,
+      ...n,
+      id: `combined-${n.publicKey}`,
+      elevAgl: 5,
+      txPowerDbm: 30,
+      gainDbi: 0,
+      terrainH: 0,
     })),
-    ...state.plannedNodes,
+    ...state.plannedNodes.map(n => ({
+      ...n,
+      id: `combined-${n.id}`,
+    })),
   ];
 
   for (const node of allNodes) {
-    await computeAndRenderCoverage(viewer, { ...node, id: `combined-${node.id}` });
+    await computeAndRenderCoverage(viewer, node);
   }
 }
 

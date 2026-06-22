@@ -48,16 +48,16 @@ describe('classifySignal', () => {
     expect(classifySignal(-109)).toBe('good');
   });
 
-  it('classifies marginal at -110 dBm', () => {
-    expect(classifySignal(-110)).toBe('marginal');
+  it('classifies good at -110 dBm', () => {
+    expect(classifySignal(-110)).toBe('good');
   });
 
   it('classifies marginal at -129 dBm', () => {
     expect(classifySignal(-129)).toBe('marginal');
   });
 
-  it('classifies blocked at -130 dBm', () => {
-    expect(classifySignal(-130)).toBe('blocked');
+  it('classifies marginal at -130 dBm', () => {
+    expect(classifySignal(-130)).toBe('marginal');
   });
 });
 

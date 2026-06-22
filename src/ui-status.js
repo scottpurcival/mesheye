@@ -13,10 +13,16 @@ export function updateStatus() {
   // Populate unlocated list in layers panel
   const listEl = document.getElementById('unlocated-list');
   const unlocatedNodes = [...state.nodes.values()].filter(n => n.lat == null);
-  if (unlocatedNodes.length === 0) {
-    listEl.textContent = '';
-    return;
+  listEl.textContent = '';
+  if (unlocatedNodes.length === 0) return;
+
+  const header = document.createElement('strong');
+  header.style.color = '#4fc3f7';
+  header.textContent = `Unlocated nodes (${unlocatedNodes.length}):`;
+  listEl.appendChild(header);
+
+  for (const n of unlocatedNodes) {
+    listEl.appendChild(document.createElement('br'));
+    listEl.appendChild(document.createTextNode(`• ${n.name} (${n.role})`));
   }
-  listEl.innerHTML = `<strong style="color:#4fc3f7">Unlocated nodes (${unlocatedNodes.length}):</strong><br>` +
-    unlocatedNodes.map(n => `• ${n.name} (${n.role})`).join('<br>');
 }
