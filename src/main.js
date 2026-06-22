@@ -6,6 +6,7 @@ import { renderNodes } from './node-layer.js';
 import { renderLinks } from './link-layer.js';
 import { initPanel } from './ui-panel.js';
 import { initLayers } from './layers.js';
+import { updateStatus } from './ui-status.js';
 
 Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 
@@ -25,8 +26,7 @@ async function syncCoreScope() {
 
     renderNodes(viewer, nodes);
     renderLinks(viewer, [...state.packets.values()], state.nodes);
-    document.getElementById('statusbar').textContent =
-      `${state.nodes.size} nodes | ${state.packets.size} links | Last sync ${state.lastSyncTime.toLocaleTimeString()}`;
+    updateStatus();
   } catch (err) {
     console.error('CoreScope sync failed:', err);
     document.getElementById('statusbar').textContent =
