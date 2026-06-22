@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import { state } from './state.js';
-import { eirpStatus, TX_POWER_MIN_DBM, TX_POWER_MAX_DBM, EIRP_LIMIT_DBM } from './eirp.js';
+import { eirpStatus, EIRP_LIMIT_DBM } from './eirp.js';
 import { computeAndRenderCoverage, clearCoverageLayer } from './coverage.js';
 
 let _viewer;
@@ -121,22 +121,6 @@ export function initPanel(viewer) {
     hidePanel();
   });
 
-  // Click existing node to select it
-  viewer.screenSpaceEventHandler.setInputAction(movement => {
-    if (state.isPlacingNode) return;
-    const picked = viewer.scene.pick(movement.position);
-    if (Cesium.defined(picked) && picked.id?.id) {
-      const entityId = picked.id.id;
-      state.selectedNodeId = entityId;
-      const existing = state.nodes.get(entityId);
-      const planned = state.plannedNodes.find(n => n.id === entityId);
-      if (existing) showPanel({ ...existing, elevAgl: 5, txPowerDbm: 30, gainDbi: 0 }, false);
-      if (planned) showPanel(planned, true);
-    } else {
-      hidePanel();
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
   // Plan Node button: enter placement mode
   document.getElementById('btn-plan-node').addEventListener('click', () => {
     state.isPlacingNode = true;
@@ -144,31 +128,46 @@ export function initPanel(viewer) {
     viewer.container.style.cursor = 'crosshair';
   });
 
-  // Placement click
+  // Single LEFT_CLICK handler: branches on placement vs. selection mode
   viewer.screenSpaceEventHandler.setInputAction(movement => {
-    if (!state.isPlacingNode) return;
-    state.isPlacingNode = false;
-    document.getElementById('btn-plan-node').textContent = '+ Plan Node';
-    viewer.container.style.cursor = '';
+    if (state.isPlacingNode) {
+      // Placement mode: drop a new planned node
+      state.isPlacingNode = false;
+      document.getElementById('btn-plan-node').textContent = '+ Plan Node';
+      viewer.container.style.cursor = '';
 
-    const cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
-    if (!cartesian) return;
-    const carto = Cesium.Cartographic.fromCartesian(cartesian);
-    const lat = Cesium.Math.toDegrees(carto.latitude);
-    const lon = Cesium.Math.toDegrees(carto.longitude);
+      const cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
+      if (!cartesian) return;
+      const carto = Cesium.Cartographic.fromCartesian(cartesian);
+      const lat = Cesium.Math.toDegrees(carto.latitude);
+      const lon = Cesium.Math.toDegrees(carto.longitude);
 
-    const node = {
-      id: `planned-${Date.now()}`,
-      name: `Planned ${state.plannedNodes.length + 1}`,
-      lat, lon,
-      elevAgl: 5,
-      txPowerDbm: 30,
-      gainDbi: 0,
-      terrainH: 0,
-    };
-    state.plannedNodes.push(node);
-    state.selectedNodeId = node.id;
-    addPlannedNodeEntity(node);
-    showPanel(node, true);
+      const node = {
+        id: `planned-${Date.now()}`,
+        name: `Planned ${state.plannedNodes.length + 1}`,
+        lat, lon,
+        elevAgl: 5,
+        txPowerDbm: 30,
+        gainDbi: 0,
+        terrainH: 0,
+      };
+      state.plannedNodes.push(node);
+      state.selectedNodeId = node.id;
+      addPlannedNodeEntity(node);
+      showPanel(node, true);
+    } else {
+      // Selection mode: pick an existing or planned node
+      const picked = viewer.scene.pick(movement.position);
+      if (Cesium.defined(picked) && picked.id?.id) {
+        const entityId = picked.id.id;
+        state.selectedNodeId = entityId;
+        const existing = state.nodes.get(entityId);
+        const planned = state.plannedNodes.find(n => n.id === entityId);
+        if (existing) showPanel({ ...existing, elevAgl: 5, txPowerDbm: 30, gainDbi: 0 }, false);
+        if (planned) showPanel(planned, true);
+      } else {
+        hidePanel();
+      }
+    }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
