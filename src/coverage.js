@@ -4,8 +4,8 @@ import { patternNFromBeamwidth } from './propagation.js';
 import { state } from './state.js';
 import { evaluateProbableLinks, clearProbableLinks } from './probable-links.js';
 
-export const RAY_COUNT = 90;
-export const SAMPLE_COUNT = 100;
+export const RAY_COUNT = 72;
+export const SAMPLE_COUNT = 80;
 export const RANGE_KM = 128;
 export const MIN_DIST_KM = 0.01; // 10 m — near-field start
 // Samples are log-spaced from MIN_DIST_KM to RANGE_KM so that close-in
@@ -64,33 +64,25 @@ function generateSamplePositions(lat0, lon0) {
   return positions;
 }
 
-async function fetchTerrainHeights(positions, viewer) {
-  const cartographics = positions.map(p =>
-    Cesium.Cartographic.fromDegrees(p.lon, p.lat)
-  );
-  await Cesium.sampleTerrain(viewer.terrainProvider, 11, cartographics);
-  return positions.map((p, i) => ({
-    ...p,
-    terrainH: cartographics[i].height ?? 0,
-  }));
-}
-
 export async function computeAndRenderCoverage(viewer, node) {
-  // Use uncapped EIRP for physical prediction; compliance warning is shown in the UI panel.
   const eirpDbm = calcEirp(node.txPowerDbm, node.gainDbi);
 
-  // Fetch node's own terrain height (level 11 matches sample grid — fast)
-  const [nodeCartographic] = await (async () => {
-    const c = [Cesium.Cartographic.fromDegrees(node.lon, node.lat)];
-    await Cesium.sampleTerrain(viewer.terrainProvider, 11, c);
-    return c;
-  })();
-  node.terrainH = nodeCartographic.height ?? 0;
-  const nodeAbsElev = node.terrainH + node.elevAgl;
-
-  // Generate and fetch terrain for all sample points
+  // Build all cartographics in one array: [0] = node, [1..N] = sample grid.
+  // Level 9 covers ~75 km per tile at Queensland latitudes — typically only
+  // 10–15 tiles for a 128 km circle vs ~180 tiles at level 11. Tiles at level
+  // 9 are also frequently already cached by the map viewer.
   const samplePositions = generateSamplePositions(node.lat, node.lon);
-  const samplesWithHeight = await fetchTerrainHeights(samplePositions, viewer);
+  const allCarto = [
+    Cesium.Cartographic.fromDegrees(node.lon, node.lat),
+    ...samplePositions.map(p => Cesium.Cartographic.fromDegrees(p.lon, p.lat)),
+  ];
+  await Cesium.sampleTerrain(viewer.terrainProvider, 9, allCarto);
+
+  node.terrainH = allCarto[0].height ?? 0;
+  const nodeAbsElev = node.terrainH + node.elevAgl;
+  const samplesWithHeight = samplePositions.map((p, i) => ({
+    ...p, terrainH: allCarto[i + 1].height ?? 0,
+  }));
 
   // Arrange into flat array indexed [r * SAMPLE_COUNT + s] (s is 0-indexed)
   const samples = new Array(RAY_COUNT * SAMPLE_COUNT).fill(null);
