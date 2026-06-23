@@ -82,4 +82,7 @@ function clearCombinedCoverage(viewer) {
     const p = primitives.get(i);
     if (p.name?.startsWith('coverage-combined-')) primitives.remove(p);
   }
+  for (const key of [...state.coverage.keys()]) {
+    if (key.startsWith('combined-')) state.coverage.delete(key);
+  }
 }

@@ -170,6 +170,7 @@ export function clearCoverageLayer(viewer, nodeId) {
       break;
     }
   }
+  state.coverage.delete(nodeId);
 }
 
 export function setCoverageLayerVisible(viewer, visible) {

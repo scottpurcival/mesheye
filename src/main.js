@@ -52,11 +52,19 @@ async function bootstrap() {
   // Replace default Bing satellite with OpenStreetMap
   viewer.imageryLayers.removeAll();
   viewer.imageryLayers.addImageryProvider(
-    new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })
+    // maximumLevel=17 caps imagery at ~150m/tile resolution — fine for coverage
+    // planning but prevents loading thousands of tiles when the user zooms in.
+    new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/', maximumLevel: 17 })
   );
 
   // Exaggerate vertical scale so terrain relief is visible at regional zoom
   viewer.scene.verticalExaggeration = 3.0;
+
+  // Memory caps — default Cesium settings load tiles aggressively.
+  // maxSSE=4 (default 2) halves tile refinement → roughly half the tile count.
+  // tileCacheSize=50 (default 100) halves terrain tile cache.
+  viewer.scene.globe.maximumScreenSpaceError = 4;
+  viewer.scene.globe.tileCacheSize = 50;
 
   // Fly to Queensland with a 45° tilt so terrain is immediately visible
   viewer.camera.flyTo({
