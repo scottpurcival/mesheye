@@ -31,6 +31,8 @@
     .layer-row input[type="checkbox"] { accent-color: #4fc3f7; }
     .separator { border: none; border-top: 1px solid #2a2a3e; }
     .section-title { font-size: 12px; color: #4fc3f7; text-transform: uppercase; letter-spacing: 1px; }
+    #coverage-legend { position: absolute; bottom: 32px; right: 12px; background: #0a0a14cc; border: 1px solid #2a2a3e; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #ccc; pointer-events: none; display: none; }
+    #coverage-legend.visible { display: block; }
   </style>
 </head>
 <body>
@@ -67,11 +69,24 @@
         </div>
         <div>
           <div class="field-label">Antenna Gain (dBi)</div>
-          <input type="number" id="pn-gain" value="0" min="0" max="12" step="0.5" />
+          <input type="number" id="pn-gain" value="0" min="0" max="30" step="0.5" />
+        </div>
+        <div>
+          <div class="field-label">Vert. Beamwidth (°) <span style="color:#666;font-size:10px;">from datasheet</span></div>
+          <input type="number" id="pn-beamwidth" placeholder="auto (from gain)" min="2" max="178" step="1" />
+        </div>
+        <div>
+          <div class="field-label">Elevation Pattern</div>
+          <canvas id="pn-pattern" width="130" height="130" style="display:block; border-radius:4px; background:#0a0a14;"></canvas>
+        </div>
+        <div>
+          <div class="field-label">Noise Floor (dBm)</div>
+          <input type="number" id="pn-noise-floor" value="-130" min="-140" max="-80" step="1" />
         </div>
         <div class="eirp-readout eirp-ok" id="pn-eirp">EIRP: 30 dBm ✓</div>
         <div id="pn-eirp-warn" style="display:none; font-size:12px; color:#ef5350;"></div>
         <button class="btn" id="pn-calc">Calculate Coverage</button>
+        <button class="btn btn-outline" id="pn-toggle-cov" style="display:none;">Hide Coverage</button>
         <button class="btn btn-danger" id="pn-remove" style="display:none;">Remove Node</button>
       </div>
       <div id="panel-layers">
@@ -87,10 +102,32 @@
         <label class="layer-row"><input type="checkbox" id="lyr-coverage" checked /> Coverage (selected node)</label>
         <label class="layer-row"><input type="checkbox" id="lyr-coverage-combined" /> Combined coverage</label>
         <hr class="separator" />
+        <div class="section-title">Coverage Target</div>
+        <div>
+          <div class="field-label">Receiver height AGL (m)</div>
+          <input type="number" id="rx-height" value="1.5" min="0" max="20" step="0.5" />
+        </div>
+        <div>
+          <div class="field-label">Receiver gain (dBi)</div>
+          <input type="number" id="rx-gain" value="2" min="0" max="6" step="0.5" />
+        </div>
+        <hr class="separator" />
         <div id="unlocated-list" style="font-size:12px; color:#888;"></div>
       </div>
     </div>
-    <div id="cesium-container"></div>
+    <div id="cesium-container">
+      <div id="coverage-legend">
+        <div style="font-size:10px; color:#888; margin-bottom:5px; letter-spacing:0.5px; text-transform:uppercase;">Signal Strength</div>
+        <div style="display:flex; align-items:center; gap:7px;">
+          <div style="width:100px; height:9px; border-radius:3px; background:linear-gradient(to right,#ff2200,#ffcc00,#00ee44); flex-shrink:0;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; width:100px; margin-top:2px;">
+          <span style="font-size:9px; color:#666;">&minus;130 dBm</span>
+          <span style="font-size:9px; color:#666;">&minus;50+ dBm</span>
+        </div>
+        <div style="font-size:9px; color:#444; margin-top:4px;">Terrain-blocked = not shown</div>
+      </div>
+    </div>
   </div>
   <div id="statusbar">Initialising…</div>
   <script type="module" src="/src/main.js"></script>

@@ -6,4 +6,6 @@ export const state = {
   selectedNodeId: null,      // publicKey or planned node id
   isPlacingNode: false,
   lastSyncTime: null,        // Date
+  rxHeightAgl: 1.5,          // m — handheld receiver height above ground
+  rxGainDbi: 2,              // dBi — typical Meshtastic whip antenna
 };

@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { fetchNodes, fetchLinks } from './api.js';
 import { renderNodes } from './node-layer.js';
 import { renderLinks } from './link-layer.js';
-import { initPanel } from './ui-panel.js';
+import { initPanel, restorePlannedNodes } from './ui-panel.js';
 import { initLayers } from './layers.js';
 import { updateStatus } from './ui-status.js';
 
@@ -49,8 +49,23 @@ async function bootstrap() {
     fullscreenButton: false,
   });
 
+  // Replace default Bing satellite with OpenStreetMap
+  viewer.imageryLayers.removeAll();
+  viewer.imageryLayers.addImageryProvider(
+    new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })
+  );
+
+  // Exaggerate vertical scale so terrain relief is visible at regional zoom
+  viewer.scene.verticalExaggeration = 3.0;
+
+  // Fly to Queensland with a 45° tilt so terrain is immediately visible
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(144.0, -22.0, 2_000_000),
+    destination: Cesium.Cartesian3.fromDegrees(149.0, -24.0, 800_000),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-45),
+      roll: 0,
+    },
     duration: 0,
   });
 
@@ -59,6 +74,7 @@ async function bootstrap() {
 
   document.getElementById('btn-sync').addEventListener('click', syncCoreScope);
   initPanel(viewer);
+  restorePlannedNodes(viewer);
   initLayers(viewer);
 }
 

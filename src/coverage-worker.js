@@ -8,9 +8,9 @@ self.onmessage = ({ data }) => {
 };
 
 function computeCoverage({ node, samples, rayCount, sampleCount }) {
-  // node: { nodeAbsElev, eirpDbm, gainDbi }
+  // node: { nodeAbsElev, eirpDbm, gainDbi, rxHeightAgl, rxGainDbi, patternN }
   // samples: flat array of {lat, lon, terrainH, distKm}, indexed [r * sampleCount + s]
-  const { nodeAbsElev, eirpDbm, gainDbi } = node;
+  const { nodeAbsElev, eirpDbm, gainDbi, rxHeightAgl, rxGainDbi, patternN = null } = node;
   const points = [];
 
   for (let r = 0; r < rayCount; r++) {
@@ -22,20 +22,21 @@ function computeCoverage({ node, samples, rayCount, sampleCount }) {
 
       const { lat, lon, terrainH, distKm } = sample;
       const distM = distKm * 1000;
-      const elevAngleRad = Math.atan2(terrainH - nodeAbsElev, distM);
 
-      const visible = elevAngleRad >= maxHorizonAngle;
-      maxHorizonAngle = Math.max(maxHorizonAngle, elevAngleRad);
+      // Terrain surface angle — used to update the horizon (obstacles block at terrain height)
+      const terrainAngle = Math.atan2(terrainH - nodeAbsElev, distM);
+      // Receiver angle — receiver is rxHeightAgl above the terrain surface
+      const rxAngle = Math.atan2(terrainH + rxHeightAgl - nodeAbsElev, distM);
 
-      if (!visible) {
-        // Don't push blocked points — saves memory; renderer treats absent points as blocked
-        continue;
-      }
+      const visible = rxAngle >= maxHorizonAngle;
+      maxHorizonAngle = Math.max(maxHorizonAngle, terrainAngle);
 
-      const pRx = receivedPowerDbm({ eirpDbm, distKm, gainDbi, elevAngleRad });
-      const classification = classifySignal(pRx);
+      if (!visible) continue;
+
+      const pRxDbm = receivedPowerDbm({ eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN });
+      const classification = classifySignal(pRxDbm);
       if (classification !== 'blocked') {
-        points.push({ lat, lon, classification });
+        points.push({ lat, lon, terrainH, classification, pRxDbm, r, s });
       }
     }
   }
