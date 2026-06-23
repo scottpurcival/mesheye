@@ -37,7 +37,12 @@ export function evaluateProbableLinks(viewer, sourceNode, points) {
 
   const ds = new Cesium.CustomDataSource(DS_NAME);
 
-  for (const [, node] of state.nodes) {
+  const candidates = [
+    ...state.nodes.values(),
+    ...state.plannedNodes.filter(n => n.id !== sourceNode.id),
+  ];
+
+  for (const node of candidates) {
     if (!node.lat || !node.lon) continue;
 
     const distKm = haversineKm(sourceNode.lat, sourceNode.lon, node.lat, node.lon);
@@ -58,8 +63,10 @@ export function evaluateProbableLinks(viewer, sourceNode, points) {
 
     // Reverse link: this node → source (path loss symmetric; EIRP may differ)
     const existingEirpDbm = calcEirp(node.txPowerDbm ?? 30, node.gainDbi ?? 2);
-    const pathLossDb = sourceEirpDbm - forwardRxDbm;
-    const reverseRxDbm = existingEirpDbm - pathLossDb;
+    // forwardRxDbm includes state.rxGainDbi from the coverage worker — strip it to get
+    // pure propagation loss, then add the source node's own antenna gain as RX gain.
+    const propagationLossDb = sourceEirpDbm - forwardRxDbm + state.rxGainDbi;
+    const reverseRxDbm = existingEirpDbm - propagationLossDb + (sourceNode.gainDbi ?? 0);
     const reverseOk = reverseRxDbm >= sourceNoiseFloor;
 
     if (!forwardOk && !reverseOk) continue;
