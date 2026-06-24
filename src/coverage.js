@@ -68,15 +68,15 @@ export async function computeAndRenderCoverage(viewer, node) {
   const eirpDbm = calcEirp(node.txPowerDbm, node.gainDbi);
 
   // Build all cartographics in one array: [0] = node, [1..N] = sample grid.
-  // Level 9 covers ~75 km per tile at Queensland latitudes — typically only
-  // 10–15 tiles for a 128 km circle vs ~180 tiles at level 11. Tiles at level
-  // 9 are also frequently already cached by the map viewer.
+  // Level 11 gives ~560 m grid spacing in Queensland — necessary to resolve
+  // ridges and valleys. Level 9 (~2.2 km) is too coarse: terrain features
+  // visible on the map are invisible to the viewshed at that resolution.
   const samplePositions = generateSamplePositions(node.lat, node.lon);
   const allCarto = [
     Cesium.Cartographic.fromDegrees(node.lon, node.lat),
     ...samplePositions.map(p => Cesium.Cartographic.fromDegrees(p.lon, p.lat)),
   ];
-  await Cesium.sampleTerrain(viewer.terrainProvider, 9, allCarto);
+  await Cesium.sampleTerrain(viewer.terrainProvider, 11, allCarto);
 
   node.terrainH = allCarto[0].height ?? 0;
   const nodeAbsElev = node.terrainH + node.elevAgl;
@@ -125,14 +125,14 @@ function signalColor(pRxDbm) {
 function renderCoveragePoints(viewer, nodeId, points) {
   clearCoverageLayer(viewer, nodeId);
 
-  const ve = viewer.scene.verticalExaggeration;
   const collection = new Cesium.PointPrimitiveCollection();
 
   for (const p of points) {
     collection.add({
-      position: Cesium.Cartesian3.fromDegrees(
-        p.lon, p.lat, (p.terrainH ?? 0) * ve,
-      ),
+      // verticalExaggeration scales terrain geometry in 3D space but does NOT
+      // affect primitive positions — supply raw ellipsoidal height so dots sit
+      // on the actual (unexaggerated) terrain surface.
+      position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.terrainH ?? 0),
       color: signalColor(p.pRxDbm),
       pixelSize: 4,
     });
