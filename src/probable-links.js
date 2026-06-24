@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { RAY_COUNT, SAMPLE_COUNT, RANGE_KM, MIN_DIST_KM } from './coverage.js';
 
 const DS_NAME = 'probable-links';
+const LINE_CLEARANCE_M = 30;
 
 function bearingDeg(lat1, lon1, lat2, lon2) {
   const φ1 = lat1 * Math.PI / 180;
@@ -38,7 +39,7 @@ export async function evaluateProbableLinks(viewer, sourceNode, points) {
     ...state.plannedNodes.filter(n => n.id !== sourceNode.id),
   ];
 
-  // Sample terrain at level 9 for candidate nodes that don't have a height yet.
+  // Sample terrain (level 9) for candidate nodes that don't have a height yet.
   const needHeight = candidates.filter(n => n.lat && n.lon && n.terrainH == null);
   if (needHeight.length) {
     const cartos = needHeight.map(n => Cesium.Cartographic.fromDegrees(n.lon, n.lat));
@@ -47,7 +48,9 @@ export async function evaluateProbableLinks(viewer, sourceNode, points) {
   }
 
   const ve = viewer.scene.verticalExaggeration;
-  const srcH = (sourceNode.terrainH ?? 0) * ve;
+  // GEODESIC (default) follows ellipsoid curvature so lines stay at height.
+  // Clearance offset prevents depth-fighting against the terrain surface.
+  const srcH = (sourceNode.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve;
   const ds = new Cesium.CustomDataSource(DS_NAME);
 
   for (const node of candidates) {
@@ -87,12 +90,10 @@ export async function evaluateProbableLinks(viewer, sourceNode, points) {
 
     ds.entities.add({
       polyline: {
-        // Straight PTP line through 3D space — no terrain draping.
         positions: [
           Cesium.Cartesian3.fromDegrees(sourceNode.lon, sourceNode.lat, srcH),
-          Cesium.Cartesian3.fromDegrees(node.lon, node.lat, (node.terrainH ?? 0) * ve),
+          Cesium.Cartesian3.fromDegrees(node.lon, node.lat, (node.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve),
         ],
-        arcType: Cesium.ArcType.NONE,
         width: bidir ? 3 : 2,
         material: color,
       },
