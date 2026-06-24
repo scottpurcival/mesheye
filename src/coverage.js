@@ -6,7 +6,7 @@ import { evaluateProbableLinks, clearProbableLinks } from './probable-links.js';
 
 export const RAY_COUNT = 72;
 export const SAMPLE_COUNT = 80;
-export const RANGE_KM = 128;
+export const RANGE_KM = 150;
 export const MIN_DIST_KM = 0.01; // 10 m — near-field start
 // Samples are log-spaced from MIN_DIST_KM to RANGE_KM so that close-in
 // angles (where antenna gain pattern actually matters) are well resolved.
