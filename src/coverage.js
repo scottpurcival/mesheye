@@ -125,14 +125,14 @@ function signalColor(pRxDbm) {
 function renderCoveragePoints(viewer, nodeId, points) {
   clearCoverageLayer(viewer, nodeId);
 
+  // verticalExaggeration scales terrain geometry vertices in 3D space, so
+  // primitives must also be placed at terrainH * ve to sit on the terrain surface.
+  const ve = viewer.scene.verticalExaggeration;
   const collection = new Cesium.PointPrimitiveCollection();
 
   for (const p of points) {
     collection.add({
-      // verticalExaggeration scales terrain geometry in 3D space but does NOT
-      // affect primitive positions — supply raw ellipsoidal height so dots sit
-      // on the actual (unexaggerated) terrain surface.
-      position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.terrainH ?? 0),
+      position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, (p.terrainH ?? 0) * ve),
       color: signalColor(p.pRxDbm),
       pixelSize: 4,
     });
