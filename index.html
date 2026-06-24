@@ -18,12 +18,12 @@
     .btn-outline:hover { background: #4fc3f71a; }
     .btn-danger { background: #c62828; }
     .btn-danger:hover { background: #e53935; }
-    #panel-node, #panel-layers, #panel-unlocated { padding: 16px; display: none; flex-direction: column; gap: 10px; }
-    #panel-node.visible, #panel-layers.visible, #panel-unlocated.visible { display: flex; }
+    #panel-node, #panel-layers, #panel-unlocated, #panel-los { padding: 16px; display: none; flex-direction: column; gap: 10px; }
+    #panel-node.visible, #panel-layers.visible, #panel-unlocated.visible, #panel-los.visible { display: flex; }
     .field-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
     .field-value { font-size: 14px; }
     input[type="range"] { width: 100%; accent-color: #4fc3f7; }
-    input[type="number"] { width: 100%; padding: 4px 8px; background: #1a1a2e; border: 1px solid #2a2a3e; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
+    input[type="number"], select { width: 100%; padding: 4px 8px; background: #1a1a2e; border: 1px solid #2a2a3e; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
     .eirp-readout { font-size: 16px; font-weight: bold; padding: 8px; border-radius: 4px; text-align: center; }
     .eirp-ok { background: #1b5e2033; color: #4caf50; border: 1px solid #4caf50; }
     .eirp-warn { background: #b71c1c33; color: #ef5350; border: 1px solid #ef5350; }
@@ -39,11 +39,27 @@
   <div id="topbar">
     <h1>MeshEye</h1>
     <button class="btn btn-outline" id="btn-layers">Layers</button>
+    <button class="btn btn-outline" id="btn-los">LOS Check</button>
     <button class="btn btn-outline" id="btn-sync">Sync CoreScope</button>
     <button class="btn" id="btn-plan-node">+ Plan Node</button>
   </div>
   <div id="main">
     <div id="sidebar">
+      <div id="panel-los">
+        <div class="section-title">LOS Profile</div>
+        <hr class="separator" />
+        <div>
+          <div class="field-label">Node A</div>
+          <select id="los-node-a"></select>
+        </div>
+        <div>
+          <div class="field-label">Node B</div>
+          <select id="los-node-b"></select>
+        </div>
+        <button class="btn" id="los-compute">Check LOS</button>
+        <canvas id="los-chart" width="248" height="190" style="display:block; border-radius:4px; background:#0a0a14;"></canvas>
+        <div id="los-result" style="font-size:11px; min-height:16px;"></div>
+      </div>
       <div id="panel-node">
         <div class="section-title">Node</div>
         <hr class="separator" />

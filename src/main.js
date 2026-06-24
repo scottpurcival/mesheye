@@ -7,6 +7,7 @@ import { renderLinks } from './link-layer.js';
 import { initPanel, restorePlannedNodes } from './ui-panel.js';
 import { initLayers } from './layers.js';
 import { updateStatus } from './ui-status.js';
+import { initLosPanel, populateDropdowns } from './los-profile.js';
 
 Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 
@@ -27,6 +28,7 @@ async function syncCoreScope() {
     renderNodes(viewer, nodes);
     await renderLinks(viewer, [...state.packets.values()], state.nodes);
     updateStatus();
+    populateDropdowns();
   } catch (err) {
     console.error('CoreScope sync failed:', err);
     document.getElementById('statusbar').textContent =
@@ -84,6 +86,7 @@ async function bootstrap() {
   initPanel(viewer);
   restorePlannedNodes(viewer);
   initLayers(viewer);
+  initLosPanel(viewer);
 }
 
 bootstrap();
