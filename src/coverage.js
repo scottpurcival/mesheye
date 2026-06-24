@@ -102,7 +102,7 @@ export async function computeAndRenderCoverage(viewer, node) {
 
   state.coverage.set(node.id, points);
   renderCoveragePoints(viewer, node.id, points);
-  evaluateProbableLinks(viewer, node, points);
+  await evaluateProbableLinks(viewer, node, points);
   document.getElementById('coverage-legend').classList.add('visible');
 }
 

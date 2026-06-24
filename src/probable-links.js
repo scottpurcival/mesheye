@@ -6,7 +6,6 @@ import { RAY_COUNT, SAMPLE_COUNT, RANGE_KM, MIN_DIST_KM } from './coverage.js';
 
 const DS_NAME = 'probable-links';
 
-// Bearing from (lat1,lon1) to (lat2,lon2), degrees 0-360 from north clockwise.
 function bearingDeg(lat1, lon1, lat2, lon2) {
   const φ1 = lat1 * Math.PI / 180;
   const φ2 = lat2 * Math.PI / 180;
@@ -25,22 +24,31 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function evaluateProbableLinks(viewer, sourceNode, points) {
+export async function evaluateProbableLinks(viewer, sourceNode, points) {
   clearProbableLinks(viewer);
 
-  // Build O(1) lookup: "r,s" → pRxDbm for all visible coverage points
   const coverageMap = new Map();
   for (const p of points) coverageMap.set(`${p.r},${p.s}`, p.pRxDbm);
 
   const sourceEirpDbm = calcEirp(sourceNode.txPowerDbm ?? 30, sourceNode.gainDbi ?? 0);
   const sourceNoiseFloor = sourceNode.noiseFloorDbm ?? SENSITIVITY_DBM;
 
-  const ds = new Cesium.CustomDataSource(DS_NAME);
-
   const candidates = [
     ...state.nodes.values(),
     ...state.plannedNodes.filter(n => n.id !== sourceNode.id),
   ];
+
+  // Sample terrain at level 9 for candidate nodes that don't have a height yet.
+  const needHeight = candidates.filter(n => n.lat && n.lon && n.terrainH == null);
+  if (needHeight.length) {
+    const cartos = needHeight.map(n => Cesium.Cartographic.fromDegrees(n.lon, n.lat));
+    await Cesium.sampleTerrain(viewer.terrainProvider, 9, cartos);
+    needHeight.forEach((n, i) => { n.terrainH = cartos[i].height ?? 0; });
+  }
+
+  const ve = viewer.scene.verticalExaggeration;
+  const srcH = (sourceNode.terrainH ?? 0) * ve;
+  const ds = new Cesium.CustomDataSource(DS_NAME);
 
   for (const node of candidates) {
     if (!node.lat || !node.lon) continue;
@@ -48,30 +56,24 @@ export function evaluateProbableLinks(viewer, sourceNode, points) {
     const distKm = haversineKm(sourceNode.lat, sourceNode.lon, node.lat, node.lon);
     if (distKm < 0.1 || distKm > RANGE_KM) continue;
 
-    // Map node position to nearest grid cell using inverse of log-spacing formula
     const bear = bearingDeg(sourceNode.lat, sourceNode.lon, node.lat, node.lon);
     const r = Math.round(bear / 360 * RAY_COUNT) % RAY_COUNT;
     const sRaw = (SAMPLE_COUNT - 1) * Math.log(distKm / MIN_DIST_KM) / Math.log(RANGE_KM / MIN_DIST_KM);
     const s = Math.min(SAMPLE_COUNT - 1, Math.max(0, Math.round(sRaw)));
 
     const forwardRxDbm = coverageMap.get(`${r},${s}`) ?? null;
-    if (forwardRxDbm === null) continue; // terrain-blocked from source
+    if (forwardRxDbm === null) continue;
 
-    // Forward link: source → this node (uses this node's noise floor)
     const nodeNoiseFloor = node.noiseFloorDbm ?? SENSITIVITY_DBM;
     const forwardOk = forwardRxDbm >= nodeNoiseFloor;
 
-    // Reverse link: this node → source (path loss symmetric; EIRP may differ)
     const existingEirpDbm = calcEirp(node.txPowerDbm ?? 30, node.gainDbi ?? 2);
-    // forwardRxDbm includes state.rxGainDbi from the coverage worker — strip it to get
-    // pure propagation loss, then add the source node's own antenna gain as RX gain.
     const propagationLossDb = sourceEirpDbm - forwardRxDbm + state.rxGainDbi;
     const reverseRxDbm = existingEirpDbm - propagationLossDb + (sourceNode.gainDbi ?? 0);
     const reverseOk = reverseRxDbm >= sourceNoiseFloor;
 
     if (!forwardOk && !reverseOk) continue;
 
-    // Cyan = bidirectional, magenta = one-way (source can reach node but not hear back)
     const bidir = forwardOk && reverseOk;
     const color = bidir
       ? Cesium.Color.fromCssColorString('#00e5ffdd')
@@ -85,13 +87,14 @@ export function evaluateProbableLinks(viewer, sourceNode, points) {
 
     ds.entities.add({
       polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray([
-          sourceNode.lon, sourceNode.lat,
-          node.lon, node.lat,
-        ]),
+        // Straight PTP line through 3D space — no terrain draping.
+        positions: [
+          Cesium.Cartesian3.fromDegrees(sourceNode.lon, sourceNode.lat, srcH),
+          Cesium.Cartesian3.fromDegrees(node.lon, node.lat, (node.terrainH ?? 0) * ve),
+        ],
+        arcType: Cesium.ArcType.NONE,
         width: bidir ? 3 : 2,
         material: color,
-        clampToGround: true,
       },
       description: label,
     });

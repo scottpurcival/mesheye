@@ -8,32 +8,51 @@ function snrToColor(snr) {
   return Cesium.Color.fromCssColorString('#ef5350cc');
 }
 
-export function renderLinks(viewer, links, nodes) {
+export async function renderLinks(viewer, links, nodes) {
   clearLinkLayer(viewer);
-  const ds = new Cesium.CustomDataSource(LINK_DS_NAME);
 
   // Build short-key (first byte of public_key) → node index for sender lookup.
-  // If two nodes share the same first byte the link is ambiguous and skipped.
   const shortIndex = new Map();
   for (const [pk, node] of nodes) {
     const byte = pk.slice(0, 2);
     shortIndex.set(byte, shortIndex.has(byte) ? null : node);
   }
 
+  // Collect unique endpoint nodes for this set of links.
+  const endpointSet = new Set();
   for (const link of links) {
-    const dst = nodes.get(link.observerId);        // receiver — full public_key match
-    const src = link.srcHash ? shortIndex.get(link.srcHash) : null;  // sender — short-ID match
+    const dst = nodes.get(link.observerId);
+    const src = link.srcHash ? shortIndex.get(link.srcHash) : null;
+    if (src?.lat && dst?.lat) { endpointSet.add(src); endpointSet.add(dst); }
+  }
+
+  // Sample terrain at level 9 for endpoints that don't already have a height.
+  // Only individual node positions — fast, just a handful of points.
+  const needHeight = [...endpointSet].filter(n => n.terrainH == null);
+  if (needHeight.length) {
+    const cartos = needHeight.map(n => Cesium.Cartographic.fromDegrees(n.lon, n.lat));
+    await Cesium.sampleTerrain(viewer.terrainProvider, 9, cartos);
+    needHeight.forEach((n, i) => { n.terrainH = cartos[i].height ?? 0; });
+  }
+
+  const ve = viewer.scene.verticalExaggeration;
+  const ds = new Cesium.CustomDataSource(LINK_DS_NAME);
+
+  for (const link of links) {
+    const dst = nodes.get(link.observerId);
+    const src = link.srcHash ? shortIndex.get(link.srcHash) : null;
     if (!src?.lat || !dst?.lat) continue;
 
     ds.entities.add({
       polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray([
-          src.lon, src.lat,
-          dst.lon, dst.lat,
-        ]),
+        // Straight PTP line through 3D space — no terrain draping.
+        positions: [
+          Cesium.Cartesian3.fromDegrees(src.lon, src.lat, (src.terrainH ?? 0) * ve),
+          Cesium.Cartesian3.fromDegrees(dst.lon, dst.lat, (dst.terrainH ?? 0) * ve),
+        ],
+        arcType: Cesium.ArcType.NONE,
         width: 3,
         material: snrToColor(link.medianSnr),
-        clampToGround: true,
       },
       description: `RSSI: ${link.medianRssi} dBm | SNR: ${link.medianSnr.toFixed(1)} dB`,
     });

@@ -25,7 +25,7 @@ async function syncCoreScope() {
     state.lastSyncTime = new Date();
 
     renderNodes(viewer, nodes);
-    renderLinks(viewer, [...state.packets.values()], state.nodes);
+    await renderLinks(viewer, [...state.packets.values()], state.nodes);
     updateStatus();
   } catch (err) {
     console.error('CoreScope sync failed:', err);
