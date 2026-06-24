@@ -94,7 +94,7 @@ export async function computeAndRenderCoverage(viewer, node) {
 
   const patternN = patternNFromBeamwidth(node.vertBeamwidthDeg);
   const points = await invokeWorker(node.id, {
-    node: { nodeAbsElev, eirpDbm, gainDbi: node.gainDbi, rxHeightAgl: state.rxHeightAgl, rxGainDbi: state.rxGainDbi, patternN },
+    node: { nodeAbsElev, eirpDbm, gainDbi: node.gainDbi, rxHeightAgl: state.rxHeightAgl, rxGainDbi: state.rxGainDbi, patternN, linkMarginDb: state.linkMarginDb },
     samples,
     rayCount: RAY_COUNT,
     sampleCount: SAMPLE_COUNT,

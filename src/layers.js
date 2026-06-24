@@ -34,6 +34,7 @@ export function initLayers(viewer) {
 
   el('rx-height').addEventListener('change', e => { state.rxHeightAgl = Number(e.target.value); });
   el('rx-gain').addEventListener('change', e => { state.rxGainDbi = Number(e.target.value); });
+  el('link-margin').addEventListener('change', e => { state.linkMarginDb = Number(e.target.value); });
 
   el('lyr-coverage-combined').addEventListener('change', async e => {
     if (e.target.checked) {

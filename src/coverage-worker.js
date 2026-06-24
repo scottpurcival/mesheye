@@ -1,9 +1,7 @@
-import { receivedPowerDbm, classifySignal } from './propagation.js';
+import { receivedPowerDbm, classifySignal, SENSITIVITY_DBM } from './propagation.js';
 
-// Effective Earth radius for radio propagation (4/3 × geometric, standard atmosphere).
-// This accounts for atmospheric refraction bending radio waves slightly downward,
-// extending the radio horizon beyond the geometric horizon.
-const R_EFF_M = 8_495_000; // 4/3 × 6 371 000 m
+const R_EFF_M = 8_495_000; // 4/3 × 6 371 000 m — standard atmospheric refraction
+const LAMBDA_M = 300 / 915; // 915 MHz wavelength in metres
 
 self.onmessage = ({ data }) => {
   if (data.type === 'compute') {
@@ -12,14 +10,23 @@ self.onmessage = ({ data }) => {
   }
 };
 
+// Fresnel-Kirchhoff knife-edge diffraction loss (dB) from dimensionless v parameter.
+// v < -0.7 → effectively in the clear (0 dB). v = 0 → 6 dB (grazing). v > 0 → deep shadow.
+// Approximation from ITU-R P.526 §4.1.
+function knifeEdgeLoss(v) {
+  if (v <= -0.7) return 0;
+  return 6.9 + 20 * Math.log10(Math.sqrt((v - 0.1) ** 2 + 1) + v - 0.1);
+}
+
 function computeCoverage({ node, samples, rayCount, sampleCount }) {
-  // node: { nodeAbsElev, eirpDbm, gainDbi, rxHeightAgl, rxGainDbi, patternN }
-  // samples: flat array of {lat, lon, terrainH, distKm}, indexed [r * sampleCount + s]
-  const { nodeAbsElev, eirpDbm, gainDbi, rxHeightAgl, rxGainDbi, patternN = null } = node;
+  const { nodeAbsElev, eirpDbm, gainDbi, rxHeightAgl, rxGainDbi, patternN = null, linkMarginDb = 0 } = node;
   const points = [];
 
   for (let r = 0; r < rayCount; r++) {
     let maxHorizonAngle = -Infinity;
+    // Track which terrain sample set the horizon — needed for diffraction geometry.
+    let obsDistM = 0;
+    let obsEffH  = 0;
 
     for (let s = 0; s < sampleCount; s++) {
       const sample = samples[r * sampleCount + s];
@@ -28,26 +35,54 @@ function computeCoverage({ node, samples, rayCount, sampleCount }) {
       const { lat, lon, terrainH, distKm } = sample;
       const distM = distKm * 1000;
 
-      // Earth bulge: the ellipsoid surface drops away from the local tangent plane
-      // at the transmitter by d²/(2·R_eff). Subtracting this makes far terrain appear
-      // at its correct geometric angle — without it the model is too pessimistic at range.
-      const earthBulge = (distM * distM) / (2 * R_EFF_M);
-      const effectiveTerrainH = terrainH - earthBulge;
+      // Earth bulge: terrain at range d sits d²/(2·R_eff) below the local tangent plane.
+      const earthBulge    = (distM * distM) / (2 * R_EFF_M);
+      const effectiveTerrH = terrainH - earthBulge;
 
-      // Terrain surface angle — used to update the horizon (obstacles block at terrain height)
-      const terrainAngle = Math.atan2(effectiveTerrainH - nodeAbsElev, distM);
-      // Receiver angle — receiver is rxHeightAgl above the terrain surface
-      const rxAngle = Math.atan2(effectiveTerrainH + rxHeightAgl - nodeAbsElev, distM);
+      // Terrain surface angle — governs the rolling horizon.
+      const terrainAngle = Math.atan2(effectiveTerrH - nodeAbsElev, distM);
+      // Receiver sits rxHeightAgl above the terrain surface at this sample.
+      const rxEffH  = effectiveTerrH + rxHeightAgl;
+      const rxAngle = Math.atan2(rxEffH - nodeAbsElev, distM);
 
       const visible = rxAngle >= maxHorizonAngle;
-      maxHorizonAngle = Math.max(maxHorizonAngle, terrainAngle);
 
-      if (!visible) continue;
+      // Update dominant obstacle before deciding what to do with blocked points.
+      if (terrainAngle > maxHorizonAngle) {
+        maxHorizonAngle = terrainAngle;
+        obsDistM = distM;
+        obsEffH  = effectiveTerrH;
+      }
 
-      const pRxDbm = receivedPowerDbm({ eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN });
-      const classification = classifySignal(pRxDbm);
-      if (classification !== 'blocked') {
-        points.push({ lat, lon, terrainH, classification, pRxDbm, r, s });
+      if (visible) {
+        // Clear line-of-sight: standard link budget + real-world margin.
+        const pRxDbm = receivedPowerDbm({
+          eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN,
+        }) - linkMarginDb;
+        const classification = classifySignal(pRxDbm);
+        if (classification !== 'blocked') {
+          points.push({ lat, lon, terrainH, classification, pRxDbm, r, s });
+        }
+      } else {
+        // Terrain-blocked: LoRa diffracts around single dominant obstacle.
+        // Only attempt if the obstacle is meaningfully between tx and rx.
+        const d2 = distM - obsDistM;
+        if (obsDistM > 0 && d2 > 100) {
+          // Height of the direct tx→rx line at the obstacle's distance.
+          const hDirectAtObs = nodeAbsElev + (rxEffH - nodeAbsElev) * (obsDistM / distM);
+          const hExcess = obsEffH - hDirectAtObs;
+          if (hExcess > 0) {
+            const v = hExcess * Math.sqrt(2 * distM / (LAMBDA_M * obsDistM * d2));
+            const diffrLoss = knifeEdgeLoss(v);
+            const pRxDbm = receivedPowerDbm({
+              eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN,
+            }) - diffrLoss - linkMarginDb;
+            if (pRxDbm >= SENSITIVITY_DBM) {
+              // Show as marginal even though terrain-blocked — diffraction keeps it alive.
+              points.push({ lat, lon, terrainH, classification: 'marginal', pRxDbm, r, s });
+            }
+          }
+        }
       }
     }
   }

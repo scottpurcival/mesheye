@@ -8,4 +8,5 @@ export const state = {
   lastSyncTime: null,        // Date
   rxHeightAgl: 1.5,          // m — handheld receiver height above ground
   rxGainDbi: 2,              // dBi — typical Meshtastic whip antenna
+  linkMarginDb: 20,          // dB — system loss not captured by FSPL (cables, Fresnel, clutter)
 };
