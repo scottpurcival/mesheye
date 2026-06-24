@@ -80,6 +80,16 @@ async function bootstrap() {
   });
 
   await syncCoreScope();
+
+  // CesiumWorldTerrain loads asynchronously after the Viewer is created.
+  // sampleTerrain during the initial sync may have hit EllipsoidTerrainProvider
+  // (returning height=0 everywhere). Re-render links once the real terrain is active.
+  const removeTerrainWatcher = viewer.scene.globe.terrainProviderChanged.addEventListener(() => {
+    removeTerrainWatcher();
+    for (const n of state.nodes.values()) n.terrainH = null;
+    renderLinks(viewer, [...state.packets.values()], state.nodes).catch(console.error);
+  });
+
   setInterval(syncCoreScope, 300_000);
 
   document.getElementById('btn-sync').addEventListener('click', syncCoreScope);
@@ -87,6 +97,7 @@ async function bootstrap() {
   restorePlannedNodes(viewer);
   initLayers(viewer);
   initLosPanel(viewer);
+
 }
 
 bootstrap();

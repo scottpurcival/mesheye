@@ -6,7 +6,11 @@ const R_EFF_M = 8_495_000;
 const FREQ_MHZ = 915;
 const LAMBDA_M = 300 / FREQ_MHZ;
 
+let _viewer;
+
 export function initLosPanel(viewer) {
+  _viewer = viewer;
+
   document.getElementById('btn-los').addEventListener('click', () => {
     const panel = document.getElementById('panel-los');
     document.getElementById('panel-node').classList.remove('visible');
@@ -23,6 +27,23 @@ export function initLosPanel(viewer) {
     const nodeB = findNode(bId);
     if (nodeA && nodeB) computeAndDraw(viewer, nodeA, nodeB);
   });
+}
+
+export function triggerLosForNodes(nodeAId, nodeBId) {
+  const nodeA = findNode(nodeAId);
+  const nodeB = findNode(nodeBId);
+  if (!nodeA || !nodeB || !_viewer) return;
+
+  // Open the LOS panel, hiding others.
+  document.getElementById('panel-node').classList.remove('visible');
+  document.getElementById('panel-layers').classList.remove('visible');
+  document.getElementById('panel-los').classList.add('visible');
+
+  populateDropdowns();
+  document.getElementById('los-node-a').value = nodeAId;
+  document.getElementById('los-node-b').value = nodeBId;
+
+  computeAndDraw(_viewer, nodeA, nodeB);
 }
 
 export function populateDropdowns() {
@@ -98,12 +119,17 @@ async function computeAndDraw(viewer, nodeA, nodeB) {
   const hB = (cartos[cartos.length - 1].height ?? 0) + (nodeB.elevAgl ?? 5);
 
   const profile = positions.map((p, i) => {
-    const terrainH  = cartos[i].height ?? 0;
-    const earthBulge = (p.distM ** 2) / (2 * R_EFF_M);
-    const effectiveH = terrainH - earthBulge;
-    const losH       = hA + (hB - hA) * (p.distM / totalDistM);
-    // First Fresnel zone radius at this point
+    const terrainH = cartos[i].height ?? 0;
     const d1 = p.distM, d2 = totalDistM - p.distM;
+    // Earth bulge for a chord path profile: the surface curves UP toward the
+    // straight LOS line by d1*d2/(2*R_eff). Add to terrain so clearance
+    // calculations account for the Earth bulging into the path.
+    // (d1*d2 is the correct parabolic formula for a two-ended chord;
+    // the viewshed worker uses d²/2R — the tangent-plane sagitta — which is
+    // a different reference frame.)
+    const earthBulge = d1 * d2 / (2 * R_EFF_M);
+    const effectiveH = terrainH + earthBulge;
+    const losH       = hA + (hB - hA) * (p.distM / totalDistM);
     const fresnelR = (d1 > 0 && d2 > 0)
       ? Math.sqrt(LAMBDA_M * d1 * d2 / totalDistM)
       : 0;

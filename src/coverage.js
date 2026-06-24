@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import { calcEirp } from './eirp.js';
-import { patternNFromBeamwidth } from './propagation.js';
+import { patternNFromBeamwidth, SENSITIVITY_DBM } from './propagation.js';
 import { state } from './state.js';
 import { evaluateProbableLinks, clearProbableLinks } from './probable-links.js';
 
@@ -100,6 +100,11 @@ export async function computeAndRenderCoverage(viewer, node) {
     sampleCount: SAMPLE_COUNT,
   });
 
+  // Clear all other nodes' coverage before showing this one.
+  for (const otherId of [...state.coverage.keys()]) {
+    if (otherId !== node.id) clearCoverageLayer(viewer, otherId);
+  }
+
   state.coverage.set(node.id, points);
   renderCoveragePoints(viewer, node.id, points);
   await evaluateProbableLinks(viewer, node, points);
@@ -131,6 +136,9 @@ function renderCoveragePoints(viewer, nodeId, points) {
   const collection = new Cesium.PointPrimitiveCollection();
 
   for (const p of points) {
+    // pRxRaw is the physical signal; pRxDbm has the link margin subtracted.
+    // Only show coverage dots where the margin-adjusted signal passes threshold.
+    if (p.pRxDbm < SENSITIVITY_DBM) continue;
     collection.add({
       position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, (p.terrainH ?? 0) * ve),
       color: signalColor(p.pRxDbm),

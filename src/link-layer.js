@@ -2,6 +2,9 @@ import * as Cesium from 'cesium';
 
 const LINK_DS_NAME = 'link-arcs';
 
+let _pickableLinks = [];
+export function getPickableLinks() { return _pickableLinks; }
+
 
 function snrToColor(snr) {
   if (snr >= 10) return Cesium.Color.fromCssColorString('#4caf50cc');
@@ -37,6 +40,7 @@ export async function renderLinks(viewer, links, nodes) {
 
   const ve = viewer.scene.verticalExaggeration;
   const ds = new Cesium.CustomDataSource(LINK_DS_NAME);
+  _pickableLinks = [];
 
   for (const link of links) {
     const dst = nodes.get(link.observerId);
@@ -46,17 +50,18 @@ export async function renderLinks(viewer, links, nodes) {
     const srcH = ((src.terrainH ?? 0) + (src.elevAgl ?? 5)) * ve;
     const dstH = ((dst.terrainH ?? 0) + (dst.elevAgl ?? 5)) * ve;
 
+    const cartA = Cesium.Cartesian3.fromDegrees(src.lon, src.lat, srcH);
+    const cartB = Cesium.Cartesian3.fromDegrees(dst.lon, dst.lat, dstH);
+
+    _pickableLinks.push({ cartA, cartB, srcId: src.publicKey, dstId: dst.publicKey });
+
+    const color = snrToColor(link.medianSnr);
     ds.entities.add({
       polyline: {
-        // GEODESIC follows ellipsoid curvature so the line stays at height
-        // rather than chord-dipping underground. Clearance offset keeps it
-        // visually above the terrain surface.
-        positions: [
-          Cesium.Cartesian3.fromDegrees(src.lon, src.lat, srcH),
-          Cesium.Cartesian3.fromDegrees(dst.lon, dst.lat, dstH),
-        ],
+        positions: [cartA, cartB],
         width: 3,
-        material: snrToColor(link.medianSnr),
+        material: color,
+        depthFailMaterial: color.withAlpha(0.35),
       },
       description: `RSSI: ${link.medianRssi} dBm | SNR: ${link.medianSnr.toFixed(1)} dB`,
     });
@@ -66,6 +71,7 @@ export async function renderLinks(viewer, links, nodes) {
 }
 
 export function clearLinkLayer(viewer) {
+  _pickableLinks = [];
   const existing = viewer.dataSources.getByName(LINK_DS_NAME)[0];
   if (existing) viewer.dataSources.remove(existing, true);
 }

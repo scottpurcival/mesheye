@@ -55,13 +55,18 @@ function computeCoverage({ node, samples, rayCount, sampleCount }) {
       }
 
       if (visible) {
-        // Clear line-of-sight: standard link budget + real-world margin.
-        const pRxDbm = receivedPowerDbm({
+        // Clear line-of-sight: standard link budget.
+        // pRxRaw = physical signal; pRxDbm = after margin (used for coverage dots).
+        // We include the point whenever pRxRaw ≥ sensitivity so that the probable-link
+        // check can use raw signal for feasibility, even when pRxDbm falls below the
+        // display threshold due to a conservative margin setting.
+        const pRxRaw = receivedPowerDbm({
           eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN,
-        }) - linkMarginDb;
-        const classification = classifySignal(pRxDbm);
-        if (classification !== 'blocked') {
-          points.push({ lat, lon, terrainH, classification, pRxDbm, r, s });
+        });
+        const pRxDbm = pRxRaw - linkMarginDb;
+        if (pRxRaw >= SENSITIVITY_DBM) {
+          const classification = classifySignal(pRxDbm);
+          points.push({ lat, lon, terrainH, classification, pRxDbm, pRxRaw, r, s });
         }
       } else {
         // Terrain-blocked: LoRa diffracts around single dominant obstacle.
@@ -74,12 +79,12 @@ function computeCoverage({ node, samples, rayCount, sampleCount }) {
           if (hExcess > 0) {
             const v = hExcess * Math.sqrt(2 * distM / (LAMBDA_M * obsDistM * d2));
             const diffrLoss = knifeEdgeLoss(v);
-            const pRxDbm = receivedPowerDbm({
+            const pRxRaw = receivedPowerDbm({
               eirpDbm, distKm, gainDbi, elevAngleRad: rxAngle, rxGainDbi, patternN,
-            }) - diffrLoss - linkMarginDb;
-            if (pRxDbm >= SENSITIVITY_DBM) {
-              // Show as marginal even though terrain-blocked — diffraction keeps it alive.
-              points.push({ lat, lon, terrainH, classification: 'marginal', pRxDbm, r, s });
+            }) - diffrLoss;
+            const pRxDbm = pRxRaw - linkMarginDb;
+            if (pRxRaw >= SENSITIVITY_DBM) {
+              points.push({ lat, lon, terrainH, classification: 'marginal', pRxDbm, pRxRaw, r, s });
             }
           }
         }
