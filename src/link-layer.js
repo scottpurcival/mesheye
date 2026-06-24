@@ -2,9 +2,6 @@ import * as Cesium from 'cesium';
 
 const LINK_DS_NAME = 'link-arcs';
 
-// Raise line endpoints this many metres above the terrain surface (visual space)
-// so lines aren't depth-fought against the ground. With ve=3 this is 3× in 3D.
-const LINE_CLEARANCE_M = 30;
 
 function snrToColor(snr) {
   if (snr >= 10) return Cesium.Color.fromCssColorString('#4caf50cc');
@@ -46,8 +43,8 @@ export async function renderLinks(viewer, links, nodes) {
     const src = link.srcHash ? shortIndex.get(link.srcHash) : null;
     if (!src?.lat || !dst?.lat) continue;
 
-    const srcH = (src.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve;
-    const dstH = (dst.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve;
+    const srcH = ((src.terrainH ?? 0) + (src.elevAgl ?? 5)) * ve;
+    const dstH = ((dst.terrainH ?? 0) + (dst.elevAgl ?? 5)) * ve;
 
     ds.entities.add({
       polyline: {

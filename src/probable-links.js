@@ -5,7 +5,6 @@ import { state } from './state.js';
 import { RAY_COUNT, SAMPLE_COUNT, RANGE_KM, MIN_DIST_KM } from './coverage.js';
 
 const DS_NAME = 'probable-links';
-const LINE_CLEARANCE_M = 30;
 
 function bearingDeg(lat1, lon1, lat2, lon2) {
   const φ1 = lat1 * Math.PI / 180;
@@ -48,9 +47,7 @@ export async function evaluateProbableLinks(viewer, sourceNode, points) {
   }
 
   const ve = viewer.scene.verticalExaggeration;
-  // GEODESIC (default) follows ellipsoid curvature so lines stay at height.
-  // Clearance offset prevents depth-fighting against the terrain surface.
-  const srcH = (sourceNode.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve;
+  const srcH = ((sourceNode.terrainH ?? 0) + (sourceNode.elevAgl ?? 5)) * ve;
   const ds = new Cesium.CustomDataSource(DS_NAME);
 
   for (const node of candidates) {
@@ -92,7 +89,7 @@ export async function evaluateProbableLinks(viewer, sourceNode, points) {
       polyline: {
         positions: [
           Cesium.Cartesian3.fromDegrees(sourceNode.lon, sourceNode.lat, srcH),
-          Cesium.Cartesian3.fromDegrees(node.lon, node.lat, (node.terrainH ?? 0) * ve + LINE_CLEARANCE_M * ve),
+          Cesium.Cartesian3.fromDegrees(node.lon, node.lat, ((node.terrainH ?? 0) + (node.elevAgl ?? 5)) * ve),
         ],
         width: bidir ? 3 : 2,
         material: color,
